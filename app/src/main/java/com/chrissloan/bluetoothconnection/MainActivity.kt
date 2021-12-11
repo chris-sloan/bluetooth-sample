@@ -28,9 +28,11 @@ import androidx.navigation.ui.setupWithNavController
 import com.chrissloan.bluetoothconnection.databinding.ActivityMainBinding
 import com.google.android.material.navigation.NavigationView
 import com.google.android.material.snackbar.Snackbar
+import dagger.hilt.android.AndroidEntryPoint
 import java.io.IOException
 import java.util.UUID
 
+@AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
     private lateinit var appBarConfiguration: AppBarConfiguration
