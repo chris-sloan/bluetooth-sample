@@ -10,4 +10,10 @@
     <string name="menu_home">Home</string>
     <string name="menu_gallery">Gallery</string>
     <string name="menu_slideshow">Slideshow</string>
+
+    <string name="dialog_permission_title">We need your permission</string>
+    <string name="dialog_permission_default_message">In order to enjoy the full features of this app, we need your permission to continue. Do you agree?</string>
+    <string name="dialog_permission_button_positive">Sure</string>
+
+    <string name="bluetooth_request_rationale">The bluetooth feature allows us to find nearby devices. In order to transfer files to a bluetooth device, we need to connect them to your device initially.</string>
 </resources>
