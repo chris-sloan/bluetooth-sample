@@ -8,7 +8,6 @@ import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
-import com.chrissloan.bluetoothconnection.R
 import com.chrissloan.bluetoothconnection.databinding.FragmentSlideshowBinding
 
 class SlideshowFragment : Fragment() {

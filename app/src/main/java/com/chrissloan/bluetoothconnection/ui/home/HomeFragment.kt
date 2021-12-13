@@ -1,7 +1,6 @@
 package com.chrissloan.bluetoothconnection.ui.home
 
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,7 +9,6 @@ import androidx.lifecycle.ViewModelProvider
 import com.chrissloan.bluetoothconnection.R
 import com.chrissloan.bluetoothconnection.databinding.FragmentHomeBinding
 import com.chrissloan.bluetoothconnection.dependencies.android.permissions.SystemPermissionsRequestHandler
-import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
