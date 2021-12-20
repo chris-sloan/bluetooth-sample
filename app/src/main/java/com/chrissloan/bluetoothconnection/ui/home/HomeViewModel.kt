@@ -5,14 +5,18 @@ import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.chrissloan.bluetoothconnection.dependencies.android.permissions.Permission
+import com.chrissloan.bluetoothconnection.usecases.bluetooth.BluetoothDeviceRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.launch
+import timber.log.Timber
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
+    private val bluetoothDeviceRepository: BluetoothDeviceRepository
 ) : ViewModel() {
-
 
     private val _viewState = MutableLiveData<HomeViewState>().apply {
         value = HomeViewState(isLoading = true)
@@ -22,11 +26,15 @@ class HomeViewModel @Inject constructor(
     val requiredPermissions = Permission.Bluetooth
 
     fun findBluetoothDevices() {
-        Log.d("HomeViewModel", "Find bluetooth devices")
+        Timber.d("Find Bluetooth Devices")
+        viewModelScope.launch {
+            val list = bluetoothDeviceRepository.getDeviceList()
+            Timber.d("Inside scope : $list")
+        }
     }
 
     fun permissionRequestDenied() {
-        Log.d("HomeViewModel", "Permission Denied. We should show an error state")
+        Timber.d("Permission Denied. We should show an error state")
     }
 }
 

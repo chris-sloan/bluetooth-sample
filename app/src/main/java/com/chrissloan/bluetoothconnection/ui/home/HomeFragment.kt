@@ -5,16 +5,17 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.viewModels
 import com.chrissloan.bluetoothconnection.R
 import com.chrissloan.bluetoothconnection.databinding.FragmentHomeBinding
 import com.chrissloan.bluetoothconnection.dependencies.android.permissions.SystemPermissionsRequestHandler
 import dagger.hilt.android.AndroidEntryPoint
+import timber.log.Timber
 
 @AndroidEntryPoint
 class HomeFragment : Fragment() {
 
-    lateinit var homeViewModel: HomeViewModel
+    private val homeViewModel: HomeViewModel by viewModels()
     private lateinit var binding: FragmentHomeBinding
 
     private val systemPermissionsRequestHandler = SystemPermissionsRequestHandler.from(this)
@@ -24,9 +25,6 @@ class HomeFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?,
     ): View {
-        homeViewModel =
-            ViewModelProvider(this).get(HomeViewModel::class.java)
-
         binding = FragmentHomeBinding.inflate(inflater, container, false)
 
         binding.fab.setOnClickListener {
@@ -34,7 +32,7 @@ class HomeFragment : Fragment() {
                 .request(homeViewModel.requiredPermissions)
                 .rationale(getString(R.string.bluetooth_request_rationale))
                 .checkDetailedPermission { wasGranted ->
-                    if (wasGranted.all { it.value } ) {
+                    if (wasGranted.all { it.value }) {
                         homeViewModel.findBluetoothDevices()
                     } else {
                         homeViewModel.permissionRequestDenied()
@@ -49,6 +47,7 @@ class HomeFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         homeViewModel.viewState.observe(viewLifecycleOwner, {
+            Timber.d("viewState -> $it")
             when {
                 it.isLoading -> {}
             }
