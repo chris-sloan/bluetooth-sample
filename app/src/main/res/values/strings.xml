@@ -16,4 +16,8 @@
     <string name="dialog_permission_button_positive">Sure</string>
 
     <string name="bluetooth_request_rationale">The bluetooth feature allows us to find nearby devices. In order to transfer files to a bluetooth device, we need to connect them to your device initially.</string>
+
+
+    <string name="show_more">Show More</string>
+    <string name="show_less">Show Less</string>
 </resources>
