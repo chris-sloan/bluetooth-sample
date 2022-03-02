@@ -1,51 +1,114 @@
 package com.chrissloan.bluetoothconnection
 
-import android.content.pm.PackageManager
 import android.os.Bundle
-import android.view.Menu
+import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.drawerlayout.widget.DrawerLayout
-import androidx.navigation.findNavController
-import androidx.navigation.ui.AppBarConfiguration
-import androidx.navigation.ui.navigateUp
-import androidx.navigation.ui.setupActionBarWithNavController
-import androidx.navigation.ui.setupWithNavController
-import com.chrissloan.bluetoothconnection.databinding.ActivityMainBinding
-import com.google.android.material.navigation.NavigationView
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.chrissloan.bluetoothconnection.dependencies.android.permissions.SystemPermissionsRequestHandler
+import com.chrissloan.bluetoothconnection.ui.home.HomePage
+import com.chrissloan.bluetoothconnection.ui.navigation.BottomNav
+import com.chrissloan.bluetoothconnection.ui.navigation.Screen
+import com.chrissloan.bluetoothconnection.ui.theme.BasicsTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
+import timber.log.Timber
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var appBarConfiguration: AppBarConfiguration
-    private lateinit var binding: ActivityMainBinding
+    private val viewModel: MainViewModel by viewModels()
+
+    private val systemPermissionsRequestHandler = SystemPermissionsRequestHandler.from(this)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-
-        setSupportActionBar(binding.appBarMain.toolbar)
-
-        val drawerLayout: DrawerLayout = binding.drawerLayout
-        val navView: NavigationView = binding.navView
-        val navController = findNavController(R.id.nav_host_fragment_content_main)
-        appBarConfiguration = AppBarConfiguration(setOf(
-            R.id.nav_home, R.id.nav_gallery, R.id.nav_slideshow), drawerLayout)
-        setupActionBarWithNavController(navController, appBarConfiguration)
-        navView.setupWithNavController(navController)
-
+        setContent {
+            MainContent(fabClickListener)
+        }
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        menuInflater.inflate(R.menu.main, menu)
-        return true
+    private val fabClickListener = {
+        systemPermissionsRequestHandler
+            .request(viewModel.requiredPermissions)
+            .rationale(getString(R.string.bluetooth_request_rationale))
+            .checkDetailedPermission { wasGranted ->
+                if (wasGranted.all { it.value }) {
+                    viewModel.refreshBluetoothDevices()
+                } else {
+                    viewModel.permissionRequestDenied()
+                }
+            }
     }
+}
 
-    override fun onSupportNavigateUp(): Boolean {
-        val navController = findNavController(R.id.nav_host_fragment_content_main)
-        return navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
+@Composable
+fun MainContent(fabClickListener: () -> Unit) {
+    val scaffoldState = rememberScaffoldState(rememberDrawerState(DrawerValue.Closed))
+    val scope = rememberCoroutineScope()
+    val viewModel = viewModel<MainViewModel>()
+    val viewState = viewModel.viewState.observeAsState().value
+    val navController = rememberNavController()
+    Timber.d("View state is : $viewState")
+    BasicsTheme {
+        Scaffold(
+            scaffoldState = scaffoldState,
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(id = R.string.app_name)) },
+                    backgroundColor = MaterialTheme.colors.primary,
+                    navigationIcon = {
+                        IconButton(
+                            onClick = {
+                                scope.launch { scaffoldState.drawerState.open() }
+                            }
+                        ) {
+                            Icon(Icons.Filled.Menu, "")
+                        }
+                    }
+                )
+            },
+            floatingActionButtonPosition = FabPosition.End,
+            floatingActionButton = {
+                ExtendedFloatingActionButton(
+                    icon = { Icon(Icons.Filled.Refresh, "Find Bluetooth Devices") },
+                    text = { Text("Find Devices") },
+                    onClick = fabClickListener,
+                    elevation = FloatingActionButtonDefaults.elevation(8.dp)
+                )
+            },
+            drawerContent = { Text(text = "drawerContent") },
+            bottomBar = { BottomNav(navController) },
+        ) { innerPadding ->
+            NavHost(
+                navController = navController,
+                startDestination = Screen.Devices.name,
+                modifier = Modifier.padding(innerPadding)
+            ) {
+                composable(Screen.Devices.name) {
+                    Timber.i("Devices list size is : ${viewState?.data}")
+                    HomePage(devices = viewState?.data ?: emptyList()) {
+                        Timber.d("Homepage clicked")
+                    }
+                }
+                composable(Screen.Files.name) {
+                    Text("Files Upload")
+                }
+            }
+        }
     }
 }

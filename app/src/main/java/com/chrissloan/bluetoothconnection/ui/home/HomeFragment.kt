@@ -1,12 +1,11 @@
 package com.chrissloan.bluetoothconnection.ui.home
 
-import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothDevice
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -16,110 +15,62 @@ import androidx.compose.material.*
 import androidx.compose.material.icons.Icons.Filled
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.fragment.app.Fragment
-import androidx.fragment.app.viewModels
 import com.chrissloan.bluetoothconnection.R
-import com.chrissloan.bluetoothconnection.dependencies.android.permissions.SystemPermissionsRequestHandler
 import com.chrissloan.bluetoothconnection.ui.theme.BasicsTheme
-import dagger.hilt.android.AndroidEntryPoint
 import timber.log.Timber
 
-@AndroidEntryPoint
-class HomeFragment : Fragment() {
-
-    private val homeViewModel: HomeViewModel by viewModels()
-
-    private val systemPermissionsRequestHandler = SystemPermissionsRequestHandler.from(this)
-
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?,
-    ): View {
-        return ComposeView(requireContext()).apply {
-            setContent {
-                HomePage(fabClickListener)
-            }
-        }
-    }
-
-    private val fabClickListener = {
-        systemPermissionsRequestHandler
-            .request(homeViewModel.requiredPermissions)
-            .rationale(getString(R.string.bluetooth_request_rationale))
-            .checkDetailedPermission { wasGranted ->
-                if ( wasGranted.all { it.value } ) {
-                    homeViewModel.findBluetoothDevices()
-                } else {
-                    homeViewModel.permissionRequestDenied()
-                }
-            }
-    }
-
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-
-        homeViewModel.viewState.observe(viewLifecycleOwner, {
-            Timber.d("viewState -> $it")
-            when {
-                it.isLoading -> {}
-                it.data.isNotEmpty() -> {
-                    Timber.d("List is :${it.data}")
-                }
-            }
-        })
-    }
-}
-
 @Composable
-fun HomePage(clickListener: () -> Unit) {
+fun HomePage(
+    devices: List<BluetoothDevice> = emptyList(),
+    clickListener: (BluetoothDevice) -> Unit
+) {
+    Timber.i("Incoming devicess : $devices")
     BasicsTheme {
-        Scaffold(
-            floatingActionButton = {
-                ExtendedFloatingActionButton(
-                    icon = { Icon(Filled.Refresh, "Find Bluetooth Devices") },
-                    text = { Text("Find Devices") },
-                    onClick = clickListener,
-                    elevation = FloatingActionButtonDefaults.elevation(8.dp)
-                )
-            },
-            content = {
-                HomeContent()
-            }
+        HomeContent(
+            devices = devices,
+            clickListener
         )
     }
 }
 
 @Composable
-fun HomeContent(names: List<String> = List(100) { "$it" }) {
+fun HomeContent(
+    devices: List<BluetoothDevice>,
+    clickListener: (BluetoothDevice) -> Unit
+) {
     LazyColumn(modifier = Modifier.padding(vertical = 4.dp)) {
-        items(items = names) { name ->
-            Greeting(name = name)
+        items(items = devices) { device ->
+            Card(device = device,
+            clickListener = clickListener)
         }
     }
 
 }
 
 @Composable
-fun Greeting(name: String) {
+fun Card(
+    device: BluetoothDevice,
+    clickListener: (BluetoothDevice) -> Unit
+) {
     Card(
         backgroundColor = MaterialTheme.colors.primary,
-        modifier = Modifier.padding(vertical = 4.dp, horizontal = 8.dp)
+        modifier = Modifier
+            .padding(vertical = 4.dp, horizontal = 8.dp)
+            .clickable { clickListener(device) }
     ) {
-        CardContent(name)
+        CardContent(device)
     }
 }
 
+@SuppressLint("MissingPermission")
 @Composable
-private fun CardContent(name: String) {
+private fun CardContent(device: BluetoothDevice) {
     var expanded by remember { mutableStateOf(false) }
 
     Row(
@@ -137,9 +88,9 @@ private fun CardContent(name: String) {
                 .weight(1f)
                 .padding(12.dp)
         ) {
-            Text(text = "Hello, ")
+            Text(text = device.address)
             Text(
-                text = name,
+                text = device.name ?: "Unknown device",
                 style = MaterialTheme.typography.h4.copy(
                     fontWeight = FontWeight.ExtraBold
                 )

@@ -1,5 +1,6 @@
 package com.chrissloan.bluetoothconnection.dependencies.android.bluetooth
 
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter.ACTION_DISCOVERY_FINISHED
 import android.bluetooth.BluetoothAdapter.ACTION_DISCOVERY_STARTED
 import android.bluetooth.BluetoothDevice
@@ -11,9 +12,16 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import com.chrissloan.bluetoothconnection.dependencies.android.broadcast.BroadcastRegistrar
 import com.chrissloan.bluetoothconnection.dependencies.android.capabilities.DeviceCapabilityChecker
-import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.withContext
 import timber.log.Timber
+import javax.inject.Inject
 
+@SuppressLint("MissingPermission")
 class BluetoothDeviceManager @Inject constructor(
     bluetoothManager: BluetoothManager,
     private val deviceCapabilityChecker: DeviceCapabilityChecker,
@@ -26,10 +34,8 @@ class BluetoothDeviceManager @Inject constructor(
         this.addAction(BluetoothDevice.ACTION_FOUND)
     }
 
-    private var startedIntent: Intent? = null
-    private var finishedIntent: Intent? = null
-
-    private var deviceDiscoveryCallback: ((DevicesState) -> Unit)? = null
+    private var startedIntent: Intent? = null // TODO Work out if needed
+    private var finishedIntent: Intent? = null // TODO Work out if needed
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -55,51 +61,82 @@ class BluetoothDeviceManager @Inject constructor(
         }
     }
 
+    private var _deviceState: DevicesState = DevicesState.BluetoothDevicesFound(emptyList())
+    val devicesState: Flow<DevicesState> = flow {
+        Timber.i("Inside DeviceState flow ")
+        while (true) {
+            Timber.i("About to emit $_deviceState")
+            emit(_deviceState)
+            delay (1000)
+        }
+    }
+
+    private val  discoveryStateChannel = Channel<DeviceDiscoveryState>()
+    private var _deviceDiscoveryState: DeviceDiscoveryState = DeviceDiscoveryState.Idle
+    val deviceDiscoveryState: Flow<DeviceDiscoveryState> = flow {
+        Timber.i("inside flow state is : $_deviceDiscoveryState")
+        while(true) {
+
+            emit(_deviceDiscoveryState)
+            delay(1000)
+        }
+    }
+
     private val deviceList: MutableList<BluetoothDevice> = mutableListOf()
 
     private fun onDeviceDiscoveryStarted() {
-        deviceDiscoveryCallback?.invoke(DevicesState.BluetoothDiscoveryStarted)
+        Timber.i("onDeviceDiscoveryStarted")
+        discoveryStateChannel.trySend(DeviceDiscoveryState.Searching)
     }
 
     private fun onDeviceDiscoveryFinished() {
-        deviceDiscoveryCallback?.invoke(DevicesState.BluetoothDevicesFound(deviceList.toList()))
+        Timber.i("onDeviceDiscoveryFinished")
+        _deviceDiscoveryState = DeviceDiscoveryState.Idle
+        _deviceState = DevicesState.BluetoothDevicesFound(deviceList)
+        cleanUp()
     }
 
-    fun scanForDevices(callback: (DevicesState) -> Unit) {
+    suspend fun scanForDevices() {
+        Timber.i("Scan for devices")
+        withContext(Dispatchers.IO) {
+            checkPermissions()
+            checkBluetoothIsEnabled()
+            deviceList.clear()
+            deviceList.addAll(bluetoothAdapter?.bondedDevices.orEmpty())
+            broadcastRegistrar.registerReceiver(receiver, filter)
+            bluetoothAdapter?.startDiscovery()
+        }
+    }
+
+    private fun checkBluetoothIsEnabled() {
+        if (bluetoothAdapter?.isEnabled == false) {
+            _deviceState = DevicesState.BluetoothNotEnabled
+        }
+    }
+
+    private fun checkPermissions() {
         if (!deviceCapabilityChecker.hasDeviceCapability(PackageManager.FEATURE_BLUETOOTH)) {
-            callback.invoke(DevicesState.BluetoothNotAvailable)
-            return
+            _deviceState = DevicesState.BluetoothNotAvailable
         }
         if (!deviceCapabilityChecker.hasDeviceCapability(PackageManager.FEATURE_BLUETOOTH_LE)) {
-            callback.invoke(DevicesState.BluetoothLENotAvailable)
-            return
+            _deviceState = DevicesState.BluetoothLENotAvailable
         }
-
-        broadcastRegistrar.registerReceiver(receiver, filter)
-
-        if (bluetoothAdapter?.isEnabled == false) {
-            callback.invoke(DevicesState.BluetoothNotEnabled)
-            return
-        }
-
-        deviceDiscoveryCallback = callback
-
-        deviceList.clear()
-        deviceList.addAll(bluetoothAdapter?.bondedDevices.orEmpty())
-        bluetoothAdapter?.startDiscovery()
     }
 
-
-    fun cleanUp() {
+    private fun cleanUp() {
         bluetoothAdapter?.cancelDiscovery()
         broadcastRegistrar.unregisterReceiver(receiver)
+    }
+
+    sealed class DeviceDiscoveryState {
+        object Idle : DeviceDiscoveryState()
+        object Searching : DeviceDiscoveryState()
     }
 
     sealed class DevicesState {
         object BluetoothNotAvailable : DevicesState()
         object BluetoothLENotAvailable : DevicesState()
         object BluetoothNotEnabled : DevicesState()
-        object BluetoothDiscoveryStarted : DevicesState()
         class BluetoothDevicesFound(val devices: List<BluetoothDevice>) : DevicesState()
     }
 }
